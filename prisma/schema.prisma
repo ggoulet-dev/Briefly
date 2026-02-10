@@ -1,0 +1,157 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum SummaryStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
+enum BriefingStatus {
+  pending
+  compiled
+  sending
+  sent
+  failed
+}
+
+model User {
+  id           Int          @id @default(autoincrement())
+  email        String       @unique
+  name         String?
+  active       Boolean      @default(true)
+  timezone     String       @default("UTC")
+  deliveryHour Int          @default(6) @map("delivery_hour")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  userTopics   UserTopic[]
+  briefings    Briefing[]
+  magicLinks   MagicLink[]
+
+  @@map("users")
+}
+
+model Topic {
+  id           Int           @id @default(autoincrement())
+  name         String
+  slug         String        @unique
+  description  String?
+  keywords     String[]
+  createdAt    DateTime      @default(now()) @map("created_at")
+  userTopics   UserTopic[]
+  sourceTopics SourceTopic[]
+
+  @@map("topics")
+}
+
+model UserTopic {
+  id       Int   @id @default(autoincrement())
+  userId   Int   @map("user_id")
+  topicId  Int   @map("topic_id")
+  priority Int   @default(0)
+  user     User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic    Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, topicId])
+  @@map("user_topics")
+}
+
+model Source {
+  id            Int           @id @default(autoincrement())
+  name          String
+  url           String
+  feedUrl       String        @unique @map("feed_url")
+  active        Boolean       @default(true)
+  lastFetchedAt DateTime?     @map("last_fetched_at")
+  etag          String?
+  lastModified  String?       @map("last_modified")
+  fetchFailures Int           @default(0) @map("fetch_failures")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  articles      Article[]
+  sourceTopics  SourceTopic[]
+
+  @@map("sources")
+}
+
+model SourceTopic {
+  id       Int    @id @default(autoincrement())
+  sourceId Int    @map("source_id")
+  topicId  Int    @map("topic_id")
+  source   Source @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  topic    Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceId, topicId])
+  @@map("source_topics")
+}
+
+model Article {
+  id               Int               @id @default(autoincrement())
+  sourceId         Int               @map("source_id")
+  title            String
+  url              String            @unique
+  author           String?
+  content          String?
+  summary          String?
+  summaryStatus    SummaryStatus     @default(pending) @map("summary_status")
+  publishedAt      DateTime?         @map("published_at")
+  guid             String?
+  contentHash      String?           @map("content_hash")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  source           Source            @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  briefingArticles BriefingArticle[]
+
+  @@index([summaryStatus])
+  @@map("articles")
+}
+
+model Briefing {
+  id               Int               @id @default(autoincrement())
+  userId           Int               @map("user_id")
+  briefingDate     DateTime          @db.Date @map("briefing_date")
+  status           BriefingStatus    @default(pending)
+  compiledAt       DateTime?         @map("compiled_at")
+  sentAt           DateTime?         @map("sent_at")
+  articleCount     Int               @default(0) @map("article_count")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  briefingArticles BriefingArticle[]
+
+  @@unique([userId, briefingDate])
+  @@map("briefings")
+}
+
+model BriefingArticle {
+  id         Int      @id @default(autoincrement())
+  briefingId Int      @map("briefing_id")
+  articleId  Int      @map("article_id")
+  position   Int
+  topicSlug  String   @map("topic_slug")
+  briefing   Briefing @relation(fields: [briefingId], references: [id], onDelete: Cascade)
+  article    Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@map("briefing_articles")
+}
+
+model MagicLink {
+  id          Int       @id @default(autoincrement())
+  userId      Int       @map("user_id")
+  tokenDigest String    @map("token_digest")
+  purpose     String    @default("signin")
+  expiresAt   DateTime  @map("expires_at")
+  usedAt      DateTime? @map("used_at")
+  ipAddress   String?   @map("ip_address")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("magic_links")
+}

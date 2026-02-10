@@ -1,0 +1,16 @@
+BRIEFLY — {{date}}
+Hello {{userName}}, here's your briefing:
+
+{{#each sections}}
+== {{topicName}} ==
+
+{{#each articles}}
+* {{title}}
+  {{summary}}
+  Source: {{sourceName}}{{#if author}} — {{author}}{{/if}}
+  Read more: {{url}}
+
+{{/each}}
+{{/each}}
+---
+Manage your preferences: {{unsubscribeUrl}}
