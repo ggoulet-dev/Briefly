@@ -1,9 +1,20 @@
 import Parser from "rss-parser";
 import { createHash } from "crypto";
-import { prisma } from "../../config/database.js";
-import type { Source } from "../../../generated/prisma/client.js";
+import { supabase } from "../../config/database.js";
 
 const parser = new Parser();
+
+export interface Source {
+  id: number;
+  name: string;
+  url: string;
+  feed_url: string;
+  active: boolean;
+  last_fetched_at: string | null;
+  etag: string | null;
+  last_modified: string | null;
+  fetch_failures: number;
+}
 
 export interface FetchResult {
   source: Source;
@@ -19,16 +30,16 @@ export async function fetchFeed(source: Source): Promise<FetchResult> {
     // Build request with conditional headers
     const headers: Record<string, string> = {};
     if (source.etag) headers["If-None-Match"] = source.etag;
-    if (source.lastModified) headers["If-Modified-Since"] = source.lastModified;
+    if (source.last_modified) headers["If-Modified-Since"] = source.last_modified;
 
-    const response = await fetch(source.feedUrl, { headers });
+    const response = await fetch(source.feed_url, { headers });
 
     // 304 Not Modified — nothing new
     if (response.status === 304) {
-      await prisma.source.update({
-        where: { id: source.id },
-        data: { lastFetchedAt: new Date() },
-      });
+      await supabase
+        .from("sources")
+        .update({ last_fetched_at: new Date().toISOString() })
+        .eq("id", source.id);
       return result;
     }
 
@@ -53,44 +64,39 @@ export async function fetchFeed(source: Source): Promise<FetchResult> {
         ? createHash("sha256").update(item.content).digest("hex")
         : null;
 
-      try {
-        await prisma.article.create({
-          data: {
-            sourceId: source.id,
-            title: item.title,
-            url: item.link,
-            author: item.creator || item.author || null,
-            content: item.contentSnippet || item.content || null,
-            publishedAt: item.isoDate ? new Date(item.isoDate) : null,
-            guid: item.guid || item.link,
-            contentHash,
-          },
-        });
-        result.newArticles++;
-      } catch (err: unknown) {
+      const { error } = await supabase.from("articles").insert({
+        source_id: source.id,
+        title: item.title,
+        url: item.link,
+        author: item.creator || item.author || null,
+        content: item.contentSnippet || item.content || null,
+        published_at: item.isoDate ? new Date(item.isoDate).toISOString() : null,
+        guid: item.guid || item.link,
+        content_hash: contentHash,
+      });
+
+      if (error) {
         // Unique constraint violation — article already exists
-        if (
-          err instanceof Error &&
-          "code" in err &&
-          (err as { code: string }).code === "P2002"
-        ) {
+        if (error.code === "23505") {
           result.skipped++;
         } else {
-          throw err;
+          throw new Error(error.message);
         }
+      } else {
+        result.newArticles++;
       }
     }
 
     // Update source metadata
-    await prisma.source.update({
-      where: { id: source.id },
-      data: {
-        lastFetchedAt: new Date(),
+    await supabase
+      .from("sources")
+      .update({
+        last_fetched_at: new Date().toISOString(),
         etag: newEtag,
-        lastModified: newLastModified,
-        fetchFailures: 0,
-      },
-    });
+        last_modified: newLastModified,
+        fetch_failures: 0,
+      })
+      .eq("id", source.id);
 
     return result;
   } catch (err: unknown) {
@@ -98,13 +104,13 @@ export async function fetchFeed(source: Source): Promise<FetchResult> {
     result.error = message;
 
     // Increment failure counter
-    await prisma.source.update({
-      where: { id: source.id },
-      data: {
-        fetchFailures: { increment: 1 },
-        lastFetchedAt: new Date(),
-      },
-    });
+    await supabase
+      .from("sources")
+      .update({
+        fetch_failures: source.fetch_failures + 1,
+        last_fetched_at: new Date().toISOString(),
+      })
+      .eq("id", source.id);
 
     return result;
   }

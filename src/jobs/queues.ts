@@ -6,7 +6,6 @@ const connection = redis;
 export const feedsQueue = new Queue("feeds", { connection });
 export const aiQueue = new Queue("ai", { connection });
 export const briefingsQueue = new Queue("briefings", { connection });
-export const mailersQueue = new Queue("mailers", { connection });
 export const maintenanceQueue = new Queue("maintenance", { connection });
 
 export async function setupCronJobs(): Promise<void> {
@@ -17,7 +16,7 @@ export async function setupCronJobs(): Promise<void> {
     { name: "fetchArticles" }
   );
 
-  // Compile + send briefings at 6am UTC
+  // Compile briefings at 6am UTC
   await briefingsQueue.upsertJobScheduler(
     "compile-briefings-cron",
     { pattern: "0 6 * * *" },

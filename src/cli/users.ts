@@ -1,51 +1,56 @@
 import type { Command } from "commander";
-import { prisma } from "../config/database.js";
-import { generateMagicLink } from "../services/auth/magicLinkGenerator.js";
-import { sendMagicLinkEmail } from "../services/email/authMailer.js";
+import { supabase } from "../config/database.js";
 
 export function registerUserCommands(program: Command): void {
   program
     .command("users:create")
-    .description("Create a user and send a magic link")
+    .description("Create a new user")
     .argument("<email>", "User email address")
     .argument("[name]", "User name")
     .action(async (email: string, name?: string) => {
-      const user = await prisma.user.create({
-        data: { email, name },
-      });
+      const { data: user, error } = await supabase
+        .from("users")
+        .insert({ email, name: name || null })
+        .select("id, email")
+        .single();
+
+      if (error) {
+        console.error(`Failed to create user: ${error.message}`);
+        process.exit(1);
+      }
+
       console.log(`Created user: ${user.email} (id: ${user.id})`);
-
-      const token = await generateMagicLink(user);
-      await sendMagicLinkEmail(user, token);
-      console.log(`Magic link sent to ${user.email}`);
-
-      await prisma.$disconnect();
     });
 
   program
     .command("users:list")
     .description("List all users with their topics")
     .action(async () => {
-      const users = await prisma.user.findMany({
-        include: {
-          userTopics: { include: { topic: true } },
-        },
-        orderBy: { id: "asc" },
-      });
+      const { data: users, error } = await supabase
+        .from("users")
+        .select("id, email, active, user_topics(topic_id, topics(slug))")
+        .order("id");
 
-      if (users.length === 0) {
+      if (error) {
+        console.error(`Failed to list users: ${error.message}`);
+        process.exit(1);
+      }
+
+      if (!users || users.length === 0) {
         console.log("No users found.");
       } else {
         for (const user of users) {
-          const topics = user.userTopics.map((ut) => ut.topic.slug).join(", ") || "none";
+          const topicEntries = (user.user_topics || []) as unknown as { topics: { slug: string } }[];
+          const topics = topicEntries
+            .map((ut) => ut.topics?.slug)
+            .filter(Boolean)
+            .join(", ") || "none";
           const status = user.active ? "active" : "inactive";
           console.log(
             `  [${user.id}] ${user.email} (${status}) — topics: ${topics}`
           );
         }
       }
-
-      await prisma.$disconnect();
     });
 
   program
@@ -54,40 +59,40 @@ export function registerUserCommands(program: Command): void {
     .argument("<email>", "User email")
     .argument("<topic_slugs>", "Comma-separated topic slugs")
     .action(async (email: string, topicSlugs: string) => {
-      const user = await prisma.user.findUnique({ where: { email } });
+      const { data: user } = await supabase
+        .from("users")
+        .select("id")
+        .eq("email", email)
+        .single();
+
       if (!user) {
         console.error(`User not found: ${email}`);
         process.exit(1);
       }
 
       const slugs = topicSlugs.split(",").map((s) => s.trim());
-      const topics = await prisma.topic.findMany({
-        where: { slug: { in: slugs } },
-      });
+      const { data: topics } = await supabase
+        .from("topics")
+        .select("id, slug")
+        .in("slug", slugs);
 
-      if (topics.length === 0) {
+      if (!topics || topics.length === 0) {
         console.error(`No matching topics found for: ${topicSlugs}`);
         process.exit(1);
       }
 
       for (const topic of topics) {
-        await prisma.userTopic.upsert({
-          where: {
-            userId_topicId: { userId: user.id, topicId: topic.id },
-          },
-          update: {},
-          create: {
-            userId: user.id,
-            topicId: topic.id,
-            priority: 0,
-          },
-        });
+        const { error } = await supabase.from("user_topics").upsert(
+          { user_id: user.id, topic_id: topic.id, priority: 0 },
+          { onConflict: "user_id,topic_id" }
+        );
+        if (error) {
+          console.error(`Failed to subscribe to ${topic.slug}: ${error.message}`);
+        }
       }
 
       console.log(
         `Subscribed ${email} to: ${topics.map((t) => t.slug).join(", ")}`
       );
-
-      await prisma.$disconnect();
     });
 }

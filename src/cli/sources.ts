@@ -1,6 +1,6 @@
 import type { Command } from "commander";
-import { prisma } from "../config/database.js";
-import { fetchFeed } from "../services/rss/feedFetcher.js";
+import { supabase } from "../config/database.js";
+import { fetchFeed, type Source } from "../services/rss/feedFetcher.js";
 
 export function registerSourceCommands(program: Command): void {
   program
@@ -12,30 +12,37 @@ export function registerSourceCommands(program: Command): void {
     .argument("[topic_slugs]", "Comma-separated topic slugs")
     .action(
       async (name: string, feedUrl: string, url: string, topicSlugs?: string) => {
-        const source = await prisma.source.create({
-          data: { name, feedUrl, url },
-        });
+        const { data: source, error } = await supabase
+          .from("sources")
+          .insert({ name, feed_url: feedUrl, url })
+          .select("id")
+          .single();
+
+        if (error) {
+          console.error(`Failed to create source: ${error.message}`);
+          process.exit(1);
+        }
 
         if (topicSlugs) {
           const slugs = topicSlugs.split(",").map((s) => s.trim());
-          const topics = await prisma.topic.findMany({
-            where: { slug: { in: slugs } },
-          });
+          const { data: topics } = await supabase
+            .from("topics")
+            .select("id, slug")
+            .in("slug", slugs);
 
-          for (const topic of topics) {
-            await prisma.sourceTopic.create({
-              data: { sourceId: source.id, topicId: topic.id },
-            });
+          if (topics) {
+            for (const topic of topics) {
+              await supabase
+                .from("source_topics")
+                .insert({ source_id: source.id, topic_id: topic.id });
+            }
+            console.log(
+              `Created source "${name}" (id: ${source.id}) linked to: ${topics.map((t) => t.slug).join(", ")}`
+            );
           }
-
-          console.log(
-            `Created source "${name}" (id: ${source.id}) linked to: ${topics.map((t) => t.slug).join(", ")}`
-          );
         } else {
           console.log(`Created source "${name}" (id: ${source.id})`);
         }
-
-        await prisma.$disconnect();
       }
     );
 
@@ -43,26 +50,32 @@ export function registerSourceCommands(program: Command): void {
     .command("sources:list")
     .description("List all sources")
     .action(async () => {
-      const sources = await prisma.source.findMany({
-        include: { sourceTopics: { include: { topic: true } } },
-        orderBy: { id: "asc" },
-      });
+      const { data: sources, error } = await supabase
+        .from("sources")
+        .select("id, name, feed_url, active, source_topics(topic_id, topics(slug))")
+        .order("id");
 
-      if (sources.length === 0) {
+      if (error) {
+        console.error(`Failed to list sources: ${error.message}`);
+        process.exit(1);
+      }
+
+      if (!sources || sources.length === 0) {
         console.log("No sources found.");
       } else {
         for (const source of sources) {
-          const topics =
-            source.sourceTopics.map((st) => st.topic.slug).join(", ") || "none";
+          const topicEntries = (source.source_topics || []) as unknown as { topics: { slug: string } }[];
+          const topics = topicEntries
+            .map((st) => st.topics?.slug)
+            .filter(Boolean)
+            .join(", ") || "none";
           const status = source.active ? "active" : "inactive";
           console.log(
             `  [${source.id}] ${source.name} (${status}) — topics: ${topics}`
           );
-          console.log(`         Feed: ${source.feedUrl}`);
+          console.log(`         Feed: ${source.feed_url}`);
         }
       }
-
-      await prisma.$disconnect();
     });
 
   program
@@ -70,9 +83,11 @@ export function registerSourceCommands(program: Command): void {
     .description("Test fetching a single source")
     .argument("<id>", "Source ID")
     .action(async (id: string) => {
-      const source = await prisma.source.findUnique({
-        where: { id: parseInt(id, 10) },
-      });
+      const { data: source } = await supabase
+        .from("sources")
+        .select("*")
+        .eq("id", parseInt(id, 10))
+        .single();
 
       if (!source) {
         console.error(`Source not found: ${id}`);
@@ -80,14 +95,12 @@ export function registerSourceCommands(program: Command): void {
       }
 
       console.log(`Testing fetch for: ${source.name}`);
-      const result = await fetchFeed(source);
+      const result = await fetchFeed(source as Source);
 
       if (result.error) {
         console.error(`Error: ${result.error}`);
       } else {
         console.log(`New: ${result.newArticles}, Skipped: ${result.skipped}`);
       }
-
-      await prisma.$disconnect();
     });
 }

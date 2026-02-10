@@ -3,53 +3,31 @@
   "version": "1.0.0",
   "description": "AI-Powered Daily News Summarization Platform",
   "scripts": {
-    "dev": "tsx src/server.ts",
     "worker": "tsx src/worker.ts",
     "cli": "tsx src/cli/index.ts",
-    "build": "tsc",
-    "db:migrate": "prisma migrate dev",
-    "db:seed": "prisma db seed",
-    "db:studio": "prisma studio"
-  },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "build": "tsc"
   },
   "type": "module",
   "license": "ISC",
   "packageManager": "pnpm@10.29.2",
   "pnpm": {
     "onlyBuiltDependencies": [
-      "bcrypt",
-      "prisma",
-      "@prisma/engines",
       "esbuild",
       "msgpackr-extract"
     ]
   },
   "dependencies": {
-    "@prisma/adapter-pg": "^7.3.0",
-    "@prisma/client": "^7.3.0",
-    "bcrypt": "^6.0.0",
+    "@supabase/supabase-js": "^2.49.4",
     "bullmq": "^5.67.3",
     "commander": "^14.0.3",
     "dotenv": "^17.2.4",
-    "express": "^5.2.1",
-    "express-session": "^1.19.0",
-    "handlebars": "^4.7.8",
     "ioredis": "^5.9.2",
-    "nodemailer": "^8.0.1",
     "openai": "^6.20.0",
     "rss-parser": "^3.13.0",
     "winston": "^3.19.0"
   },
   "devDependencies": {
-    "@types/bcrypt": "^6.0.0",
-    "@types/express": "^5.0.6",
-    "@types/express-serve-static-core": "^5.1.1",
-    "@types/express-session": "^1.18.2",
     "@types/node": "^25.2.3",
-    "@types/nodemailer": "^7.0.9",
-    "prisma": "^7.3.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }

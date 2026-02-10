@@ -1,4 +1,8 @@
-import type { Article } from "../../../generated/prisma/client.js";
+export interface ArticleForPrompt {
+  title: string;
+  author: string | null;
+  content: string | null;
+}
 
 export function buildSystemPrompt(): string {
   return `You are a news summarizer. Your job is to create concise, informative summaries of news articles.
@@ -11,7 +15,7 @@ Rules:
 - If the article content is too short or unclear, summarize what is available.`;
 }
 
-export function buildUserPrompt(article: Article): string {
+export function buildUserPrompt(article: ArticleForPrompt): string {
   const parts = [`Title: ${article.title}`];
 
   if (article.author) {

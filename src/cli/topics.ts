@@ -1,24 +1,30 @@
 import type { Command } from "commander";
-import { prisma } from "../config/database.js";
+import { supabase } from "../config/database.js";
 
 export function registerTopicCommands(program: Command): void {
   program
     .command("topics:list")
     .description("List all topics")
     .action(async () => {
-      const topics = await prisma.topic.findMany({ orderBy: { id: "asc" } });
+      const { data: topics, error } = await supabase
+        .from("topics")
+        .select("id, name, slug, keywords")
+        .order("id");
 
-      if (topics.length === 0) {
+      if (error) {
+        console.error(`Failed to list topics: ${error.message}`);
+        process.exit(1);
+      }
+
+      if (!topics || topics.length === 0) {
         console.log("No topics found.");
       } else {
         for (const topic of topics) {
           console.log(
-            `  [${topic.id}] ${topic.name} (${topic.slug}) — keywords: ${topic.keywords.join(", ")}`
+            `  [${topic.id}] ${topic.name} (${topic.slug}) — keywords: ${(topic.keywords || []).join(", ")}`
           );
         }
       }
-
-      await prisma.$disconnect();
     });
 
   program
@@ -32,14 +38,19 @@ export function registerTopicCommands(program: Command): void {
         ? keywords.split(",").map((k) => k.trim())
         : [];
 
-      const topic = await prisma.topic.create({
-        data: { name, slug, keywords: keywordList },
-      });
+      const { data: topic, error } = await supabase
+        .from("topics")
+        .insert({ name, slug, keywords: keywordList })
+        .select("id, name, slug, keywords")
+        .single();
+
+      if (error) {
+        console.error(`Failed to create topic: ${error.message}`);
+        process.exit(1);
+      }
 
       console.log(
-        `Created topic: ${topic.name} (${topic.slug}) — keywords: ${topic.keywords.join(", ")}`
+        `Created topic: ${topic.name} (${topic.slug}) — keywords: ${(topic.keywords || []).join(", ")}`
       );
-
-      await prisma.$disconnect();
     });
 }

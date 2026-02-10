@@ -5,7 +5,6 @@ import { setupCronJobs } from "./jobs/queues.js";
 import { processFetchArticles } from "./jobs/fetchArticles.js";
 import { processSummarizeArticles } from "./jobs/summarizeArticles.js";
 import { processCompileBriefings } from "./jobs/compileBriefings.js";
-import { processSendBriefing } from "./jobs/sendBriefing.js";
 import { processCleanup } from "./jobs/cleanup.js";
 
 const connection = redis;
@@ -45,15 +44,6 @@ createWorker("ai", async (job) => {
 createWorker("briefings", async (job) => {
   if (job.name === "compileBriefings") return processCompileBriefings(job);
 });
-
-// Mailers worker (higher concurrency for sending emails)
-createWorker(
-  "mailers",
-  async (job) => {
-    if (job.name === "sendBriefing") return processSendBriefing(job as Job);
-  },
-  3
-);
 
 // Maintenance worker
 createWorker("maintenance", async (job) => {

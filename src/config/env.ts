@@ -16,18 +16,13 @@ export const env = {
   nodeEnv: optional("NODE_ENV", "development"),
   isDev: optional("NODE_ENV", "development") === "development",
 
-  databaseUrl: required("DATABASE_URL"),
   redisUrl: optional("REDIS_URL", "redis://localhost:6379"),
 
   openaiApiKey: required("OPENAI_API_KEY"),
   openaiModel: optional("OPENAI_MODEL", "gpt-4o-mini"),
 
-  smtpHost: optional("SMTP_HOST", "smtp.ethereal.email"),
-  smtpPort: parseInt(optional("SMTP_PORT", "587"), 10),
-  smtpUser: optional("SMTP_USER", ""),
-  smtpPass: optional("SMTP_PASS", ""),
-  smtpFrom: optional("SMTP_FROM", "Briefly <briefings@briefly.app>"),
+  supabaseUrl: required("SUPABASE_URL"),
+  supabaseServiceRoleKey: required("SUPABASE_SERVICE_ROLE_KEY"),
 
-  appUrl: optional("APP_URL", "http://localhost:3000"),
-  sessionSecret: required("SESSION_SECRET"),
+  discordWebhookUrl: optional("DISCORD_WEBHOOK_URL", ""),
 } as const;

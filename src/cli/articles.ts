@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import { fetchAllFeeds } from "../services/rss/bulkFetcher.js";
 import { summarizePendingArticles } from "../services/ai/summarizer.js";
-import { prisma } from "../config/database.js";
+import { supabase } from "../config/database.js";
 
 export function registerArticleCommands(program: Command): void {
   program
@@ -9,7 +9,6 @@ export function registerArticleCommands(program: Command): void {
     .description("Fetch articles from all active RSS feeds")
     .action(async () => {
       await fetchAllFeeds();
-      await prisma.$disconnect();
     });
 
   program
@@ -17,30 +16,35 @@ export function registerArticleCommands(program: Command): void {
     .description("Summarize all pending articles with AI")
     .action(async () => {
       await summarizePendingArticles();
-      await prisma.$disconnect();
     });
 
   program
     .command("articles:stats")
     .description("Show article statistics")
     .action(async () => {
-      const total = await prisma.article.count();
-      const pending = await prisma.article.count({
-        where: { summaryStatus: "pending" },
-      });
-      const completed = await prisma.article.count({
-        where: { summaryStatus: "completed" },
-      });
-      const failed = await prisma.article.count({
-        where: { summaryStatus: "failed" },
-      });
+      const { count: total } = await supabase
+        .from("articles")
+        .select("*", { count: "exact", head: true });
+
+      const { count: pending } = await supabase
+        .from("articles")
+        .select("*", { count: "exact", head: true })
+        .eq("summary_status", "pending");
+
+      const { count: completed } = await supabase
+        .from("articles")
+        .select("*", { count: "exact", head: true })
+        .eq("summary_status", "completed");
+
+      const { count: failed } = await supabase
+        .from("articles")
+        .select("*", { count: "exact", head: true })
+        .eq("summary_status", "failed");
 
       console.log("Article statistics:");
-      console.log(`  Total:     ${total}`);
-      console.log(`  Pending:   ${pending}`);
-      console.log(`  Completed: ${completed}`);
-      console.log(`  Failed:    ${failed}`);
-
-      await prisma.$disconnect();
+      console.log(`  Total:     ${total ?? 0}`);
+      console.log(`  Pending:   ${pending ?? 0}`);
+      console.log(`  Completed: ${completed ?? 0}`);
+      console.log(`  Failed:    ${failed ?? 0}`);
     });
 }

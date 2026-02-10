@@ -4,6 +4,7 @@ import { registerSourceCommands } from "./sources.js";
 import { registerTopicCommands } from "./topics.js";
 import { registerArticleCommands } from "./articles.js";
 import { registerBriefingCommands } from "./briefings.js";
+import { registerDiscordCommands } from "./discord.js";
 
 program
   .name("briefly")
@@ -15,5 +16,6 @@ registerSourceCommands(program);
 registerTopicCommands(program);
 registerArticleCommands(program);
 registerBriefingCommands(program);
+registerDiscordCommands(program);
 
 program.parse();

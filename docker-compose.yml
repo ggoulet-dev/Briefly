@@ -1,15 +1,6 @@
 services:
-  postgres:
-    image: postgres:17
-    container_name: briefly-postgres
-    environment:
-      POSTGRES_USER: briefly
-      POSTGRES_PASSWORD: briefly
-      POSTGRES_DB: briefly_dev
+  redis:
+    image: redis:7-alpine
+    container_name: briefly-redis
     ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-
-volumes:
-  pgdata:
+      - "6379:6379"

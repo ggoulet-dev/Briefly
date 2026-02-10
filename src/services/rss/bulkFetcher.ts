@@ -1,18 +1,22 @@
-import { prisma } from "../../config/database.js";
+import { supabase } from "../../config/database.js";
 import { logger } from "../../config/logger.js";
-import { fetchFeed, type FetchResult } from "./feedFetcher.js";
+import { fetchFeed, type FetchResult, type Source } from "./feedFetcher.js";
 
 export async function fetchAllFeeds(): Promise<FetchResult[]> {
-  const sources = await prisma.source.findMany({
-    where: { active: true },
-  });
+  const { data: sources, error } = await supabase
+    .from("sources")
+    .select("*")
+    .eq("active", true);
 
-  logger.info(`Fetching ${sources.length} active feed(s)`);
+  if (error) throw new Error(`Failed to fetch sources: ${error.message}`);
+
+  const feedSources = (sources || []) as Source[];
+  logger.info(`Fetching ${feedSources.length} active feed(s)`);
 
   const results: FetchResult[] = [];
 
-  for (const source of sources) {
-    logger.info(`Fetching: ${source.name}`, { feedUrl: source.feedUrl });
+  for (const source of feedSources) {
+    logger.info(`Fetching: ${source.name}`, { feedUrl: source.feed_url });
     const result = await fetchFeed(source);
 
     if (result.error) {
