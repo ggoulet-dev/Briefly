@@ -3,10 +3,12 @@ import { env } from "../../config/env.js";
 import { supabase } from "../../config/database.js";
 import { logger } from "../../config/logger.js";
 import { buildSystemPrompt, buildUserPrompt, type ArticleForPrompt } from "./promptBuilder.js";
+import { fetchArticleContent } from "../rss/contentFetcher.js";
 
 interface Article {
   id: number;
   title: string;
+  url: string;
   author: string | null;
   content: string | null;
   summary_status: string;
@@ -54,7 +56,15 @@ export async function summarizeArticle(article: Article): Promise<void> {
     .eq("id", article.id);
 
   try {
-    const summary = await summarizeWithRetry(article);
+    // Fetch full article content from URL
+    const fullContent = await fetchArticleContent(article.url);
+    const articleForPrompt: ArticleForPrompt = {
+      title: article.title,
+      author: article.author,
+      content: fullContent || article.content,
+    };
+
+    const summary = await summarizeWithRetry(articleForPrompt);
     await supabase
       .from("articles")
       .update({ summary, summary_status: "completed" })
@@ -75,7 +85,7 @@ export async function summarizePendingArticles(): Promise<{
 }> {
   const { data: articles, error } = await supabase
     .from("articles")
-    .select("id, title, author, content, summary_status")
+    .select("id, title, url, author, content, summary_status")
     .eq("summary_status", "pending")
     .order("created_at", { ascending: true });
 
