@@ -60,6 +60,16 @@ export async function fetchFeed(source: Source): Promise<FetchResult> {
         continue;
       }
 
+      // Skip articles published before last fetch (already seen)
+      if (item.isoDate && source.last_fetched_at) {
+        const publishedAt = new Date(item.isoDate);
+        const lastFetched = new Date(source.last_fetched_at);
+        if (publishedAt <= lastFetched) {
+          result.skipped++;
+          continue;
+        }
+      }
+
       const contentHash = item.content
         ? createHash("sha256").update(item.content).digest("hex")
         : null;

@@ -20,7 +20,7 @@ export const env = {
 
   openaiApiKey: required("OPENAI_API_KEY"),
   openaiModel: optional("OPENAI_MODEL", "gpt-4o-mini"),
-  openaiProject: optional("OPENAI_PROJECT", ""),
+  openaiProject: optional("BRIEFLY_OPENAI_PROJECT", ""),
 
   supabaseUrl: required("SUPABASE_URL"),
   supabaseServiceRoleKey: required("SUPABASE_SERVICE_ROLE_KEY"),

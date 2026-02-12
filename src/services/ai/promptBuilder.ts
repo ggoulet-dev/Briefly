@@ -9,8 +9,8 @@ export function buildSystemPrompt(): string {
 
 Rules:
 - Write the summary in the same language as the original article.
-- Keep summaries to 2-3 sentences (max 100 words).
-- Focus on the key facts: who, what, when, where, why.
+- Summarize in exactly ONE sentence (max 40 words).
+- Focus on the single most important fact or development.
 - Be neutral and factual — no opinions or editorializing.
 - If the article content is too short or unclear, summarize what is available.`;
 }

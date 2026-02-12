@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Shortcut: ./briefly <command> instead of pnpm cli <command>
+exec pnpm cli "$@"

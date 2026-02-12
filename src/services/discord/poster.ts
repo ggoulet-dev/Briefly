@@ -2,96 +2,58 @@ import { supabase } from "../../config/database.js";
 import { env } from "../../config/env.js";
 import { logger } from "../../config/logger.js";
 
-interface TopicSection {
-  topic_name: string;
-  topic_slug: string;
-  articles: {
-    title: string;
-    url: string;
-    summary: string;
-    source_name: string;
-  }[];
+interface RecentArticle {
+  title: string;
+  url: string;
+  summary: string;
+  published_at: string | null;
+  source_name: string;
 }
 
-async function getRecentArticlesByTopic(): Promise<TopicSection[]> {
+async function getRecentArticles(): Promise<RecentArticle[]> {
   const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-  // Get all topics that have sources
-  const { data: topics, error: topicsErr } = await supabase
-    .from("topics")
-    .select("id, name, slug")
-    .order("id");
+  const { data: articles, error } = await supabase
+    .from("articles")
+    .select("title, url, summary, published_at, sources(name)")
+    .eq("summary_status", "completed")
+    .gte("created_at", oneDayAgo)
+    .order("published_at", { ascending: false })
+    .limit(20);
 
-  if (topicsErr) throw new Error(`Failed to fetch topics: ${topicsErr.message}`);
-  if (!topics || topics.length === 0) return [];
+  if (error)
+    throw new Error(`Failed to fetch articles: ${error.message}`);
+  if (!articles || articles.length === 0) return [];
 
-  const sections: TopicSection[] = [];
+  return articles.map((a) => {
+    const sourceName = (a as Record<string, unknown>).sources
+      ? ((a as Record<string, unknown>).sources as { name: string }).name
+      : "Unknown";
 
-  for (const topic of topics) {
-    // Get source IDs linked to this topic
-    const { data: sourceTopics } = await supabase
-      .from("source_topics")
-      .select("source_id")
-      .eq("topic_id", topic.id);
-
-    if (!sourceTopics || sourceTopics.length === 0) continue;
-
-    const sourceIds = sourceTopics.map((st) => st.source_id);
-
-    // Get recent summarized articles from these sources
-    const { data: articles, error: articlesErr } = await supabase
-      .from("articles")
-      .select("title, url, summary, source_id, sources(name)")
-      .eq("summary_status", "completed")
-      .gte("created_at", oneDayAgo)
-      .in("source_id", sourceIds)
-      .order("published_at", { ascending: false })
-      .limit(5);
-
-    if (articlesErr) {
-      logger.error(`Failed to fetch articles for topic ${topic.slug}`, {
-        error: articlesErr.message,
-      });
-      continue;
-    }
-
-    if (!articles || articles.length === 0) continue;
-
-    sections.push({
-      topic_name: topic.name,
-      topic_slug: topic.slug,
-      articles: articles.map((a) => ({
-        title: a.title,
-        url: a.url,
-        summary: a.summary!,
-        source_name: (a as Record<string, unknown>).sources
-          ? ((a as Record<string, unknown>).sources as { name: string }).name
-          : "Unknown",
-      })),
-    });
-  }
-
-  return sections;
+    return {
+      title: a.title,
+      url: a.url,
+      summary: a.summary!,
+      published_at: a.published_at,
+      source_name: sourceName,
+    };
+  });
 }
 
-function buildDiscordEmbeds(sections: TopicSection[]): object[] {
-  const embeds: object[] = [];
+function truncate(text: string, max: number): string {
+  if (text.length <= max) return text;
+  return text.slice(0, max - 3) + "...";
+}
 
-  for (const section of sections) {
-    const fields = section.articles.map((article) => ({
-      name: article.title,
-      value: `${article.summary}\n[Read more](${article.url}) — *${article.source_name}*`,
-    }));
-
-    embeds.push({
-      title: `📰 ${section.topic_name}`,
-      color: 0x3498db,
-      fields,
-      timestamp: new Date().toISOString(),
-    });
-  }
-
-  return embeds;
+function buildArticleEmbed(article: RecentArticle): object {
+  return {
+    title: truncate(article.title, 256),
+    url: article.url,
+    description: article.summary,
+    footer: { text: article.source_name },
+    timestamp: article.published_at ?? new Date().toISOString(),
+    color: 0x3498db,
+  };
 }
 
 export async function postToDiscord(): Promise<{ posted: number }> {
@@ -102,48 +64,63 @@ export async function postToDiscord(): Promise<{ posted: number }> {
     );
   }
 
-  const sections = await getRecentArticlesByTopic();
+  const articles = await getRecentArticles();
 
-  if (sections.length === 0) {
+  if (articles.length === 0) {
     logger.info("No articles to post to Discord.");
     return { posted: 0 };
   }
 
-  const embeds = buildDiscordEmbeds(sections);
+  // Send header message
+  const dateStr = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 
-  // Discord allows max 10 embeds per message, send in batches
-  const batchSize = 10;
+  const headerRes = await fetch(webhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      content: `📰 **Briefly** — ${dateStr} — ${articles.length} articles`,
+    }),
+  });
+
+  if (!headerRes.ok) {
+    const text = await headerRes.text();
+    throw new Error(`Discord webhook failed (${headerRes.status}): ${text}`);
+  }
+
+  // Post one embed per article with suppressed notifications
   let posted = 0;
 
-  for (let i = 0; i < embeds.length; i += batchSize) {
-    const batch = embeds.slice(i, i + batchSize);
-    const body: Record<string, unknown> = { embeds: batch };
+  for (const article of articles) {
+    await new Promise((r) => setTimeout(r, 500));
 
-    // Add content header only on the first message
-    if (i === 0) {
-      body.content = `**Briefly — Daily News Summary** (${new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })})`;
-    }
+    const embed = buildArticleEmbed(article);
 
     const response = await fetch(webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        embeds: [embed],
+        flags: 4096,
+      }),
     });
 
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(`Discord webhook failed (${response.status}): ${text}`);
+      logger.error(`Discord webhook failed for article: ${article.title}`, {
+        status: response.status,
+        text,
+      });
+      continue;
     }
 
-    posted += batch.length;
-
-    // Rate limit between batches
-    if (i + batchSize < embeds.length) {
-      await new Promise((r) => setTimeout(r, 1000));
-    }
+    posted++;
   }
 
-  const totalArticles = sections.reduce((s, sec) => s + sec.articles.length, 0);
-  logger.info(`Posted ${posted} embed(s) with ${totalArticles} article(s) to Discord`);
+  logger.info(`Posted ${posted} article(s) to Discord`);
   return { posted };
 }
