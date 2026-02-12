@@ -3,16 +3,57 @@ import { parseHTML } from "linkedom";
 import { logger } from "../../config/logger.js";
 
 const MAX_CONTENT_LENGTH = 5000;
+const MAX_REDIRECTS = 10;
+
+/**
+ * Follows redirects manually while accumulating Set-Cookie headers,
+ * which breaks cookie-gated redirect loops (e.g. TVA Sports / Qub).
+ */
+async function fetchWithCookies(
+  url: string,
+  timeout: number,
+): Promise<Response> {
+  const cookies: Map<string, string> = new Map();
+  let currentUrl = url;
+
+  for (let i = 0; i < MAX_REDIRECTS; i++) {
+    const cookieHeader = [...cookies.values()].join("; ");
+    const response = await fetch(currentUrl, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (compatible; Briefly/1.0; +https://briefly.app)",
+        Accept: "text/html",
+        ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+      },
+      redirect: "manual",
+      signal: AbortSignal.timeout(timeout),
+    });
+
+    // Collect cookies from the response
+    const setCookies = response.headers.getSetCookie();
+    for (const sc of setCookies) {
+      const pair = sc.split(";")[0]; // "name=value"
+      const eqIdx = pair.indexOf("=");
+      if (eqIdx > 0) {
+        cookies.set(pair.slice(0, eqIdx).trim(), pair.trim());
+      }
+    }
+
+    // If not a redirect, return the final response
+    if (response.status < 300 || response.status >= 400 || !response.headers.get("location")) {
+      return response;
+    }
+
+    // Resolve the next URL (handles relative redirects)
+    currentUrl = new URL(response.headers.get("location")!, currentUrl).href;
+  }
+
+  throw new Error(`Too many redirects (>${MAX_REDIRECTS})`);
+}
 
 export async function fetchArticleContent(url: string): Promise<string | null> {
   try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; Briefly/1.0; +https://briefly.app)",
-        Accept: "text/html",
-      },
-      signal: AbortSignal.timeout(10000),
-    });
+    const response = await fetchWithCookies(url, 15000);
 
     if (!response.ok) {
       logger.warn(`Failed to fetch article: HTTP ${response.status}`, { url });
