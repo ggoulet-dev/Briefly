@@ -3,4 +3,5 @@ import { env } from "./env.js";
 
 export const openai = new OpenAI({
   apiKey: env.openaiApiKey,
+  project: env.openaiProject || undefined,
 });
