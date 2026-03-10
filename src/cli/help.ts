@@ -29,6 +29,9 @@ const COMMANDS: Record<string, { cmd: string; desc: string }[]> = {
   Discord: [
     { cmd: "discord:post", desc: "Post recent news summaries to Discord" },
   ],
+  Pipeline: [
+    { cmd: "pipeline:run", desc: "Run the full pipeline: fetch → summarize → post to Discord" },
+  ],
 };
 
 export function registerHelpCommand(program: Command): void {

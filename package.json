@@ -5,7 +5,9 @@
   "scripts": {
     "worker": "tsx src/worker.ts",
     "cli": "tsx src/cli/index.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "web": "pnpm --filter briefly-web dev",
+    "web:build": "pnpm --filter briefly-web build"
   },
   "type": "module",
   "license": "ISC",

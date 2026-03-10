@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-zinc-800;
+  }
+  body {
+    @apply bg-zinc-950 text-zinc-100;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-zinc-800 bg-zinc-900/50 p-5;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+  .badge-blue {
+    @apply bg-blue-500/10 text-blue-400;
+  }
+  .badge-green {
+    @apply bg-emerald-500/10 text-emerald-400;
+  }
+  .badge-yellow {
+    @apply bg-amber-500/10 text-amber-400;
+  }
+  .badge-red {
+    @apply bg-red-500/10 text-red-400;
+  }
+  .badge-purple {
+    @apply bg-purple-500/10 text-purple-400;
+  }
+  .badge-zinc {
+    @apply bg-zinc-500/10 text-zinc-400;
+  }
+}

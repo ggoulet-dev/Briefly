@@ -5,6 +5,7 @@ import { registerTopicCommands } from "./topics.js";
 import { registerArticleCommands } from "./articles.js";
 import { registerBriefingCommands } from "./briefings.js";
 import { registerDiscordCommands } from "./discord.js";
+import { registerPipelineCommands } from "./pipeline.js";
 import { registerHelpCommand } from "./help.js";
 
 program
@@ -18,6 +19,7 @@ registerTopicCommands(program);
 registerArticleCommands(program);
 registerBriefingCommands(program);
 registerDiscordCommands(program);
+registerPipelineCommands(program);
 registerHelpCommand(program);
 
 program.parse();
