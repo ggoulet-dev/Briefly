@@ -1,15 +1,37 @@
 import { useSources } from "../lib/hooks";
+import { useFetchSource, useFetchAllSources } from "../lib/api";
 import { PageHeader } from "../components/PageHeader";
+import { ActionButton } from "../components/ActionButton";
 import { Spinner } from "../components/Spinner";
 import { EmptyState } from "../components/EmptyState";
+import { useToast } from "../components/Toast";
 import { formatDistanceToNow } from "date-fns";
 
 export function Sources() {
   const { data: sources, isLoading } = useSources();
+  const fetchAll = useFetchAllSources();
+  const fetchOne = useFetchSource();
+  const { toast } = useToast();
 
   return (
     <div>
-      <PageHeader title="Sources" description="RSS feed sources powering your pipeline" />
+      <PageHeader title="Sources" description="RSS feed sources powering your pipeline">
+        <ActionButton
+          onClick={() =>
+            fetchAll.mutate(undefined, {
+              onSuccess: (d) =>
+                toast(
+                  `Fetched ${d.sources} sources: ${d.newArticles} new, ${d.skipped} skipped${d.errors ? `, ${d.errors} errors` : ""}`,
+                  d.errors ? "error" : "success"
+                ),
+              onError: (e) => toast(e.message, "error"),
+            })
+          }
+          loading={fetchAll.isPending}
+        >
+          Fetch All Sources
+        </ActionButton>
+      </PageHeader>
 
       {isLoading ? (
         <Spinner />
@@ -58,6 +80,26 @@ export function Sources() {
                     {s.fetch_failures}
                   </span>
                 </div>
+              </div>
+
+              <div className="mt-3 border-t border-zinc-800/50 pt-3">
+                <ActionButton
+                  size="sm"
+                  variant="secondary"
+                  onClick={() =>
+                    fetchOne.mutate(s.id, {
+                      onSuccess: (d) =>
+                        toast(
+                          `${s.name}: ${d.newArticles} new, ${d.skipped} skipped`,
+                          "success"
+                        ),
+                      onError: (e) => toast(e.message, "error"),
+                    })
+                  }
+                  loading={fetchOne.isPending}
+                >
+                  Fetch Now
+                </ActionButton>
               </div>
             </div>
           ))}

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "./supabase";
+import { useAuth } from "./AuthContext";
 
 // ── Stats ──────────────────────────────────────────────
 
@@ -17,6 +18,7 @@ export interface DashboardStats {
 }
 
 export function useStats() {
+  const { session } = useAuth();
   return useQuery({
     queryKey: ["stats"],
     queryFn: async (): Promise<DashboardStats> => {
@@ -45,6 +47,7 @@ export function useStats() {
         sentBriefings: brfs.filter((b) => b.status === "sent").length,
       };
     },
+    enabled: !!session,
   });
 }
 
@@ -69,6 +72,7 @@ export function useArticles(
   offset = 0,
   searchQuery?: string
 ) {
+  const { session } = useAuth();
   return useQuery({
     queryKey: ["articles", status, limit, offset, searchQuery],
     queryFn: async () => {
@@ -90,10 +94,12 @@ export function useArticles(
       if (error) throw error;
       return (data ?? []) as unknown as Article[];
     },
+    enabled: !!session,
   });
 }
 
 export function useArticle(id: number) {
+  const { session } = useAuth();
   return useQuery({
     queryKey: ["article", id],
     queryFn: async () => {
@@ -105,7 +111,7 @@ export function useArticle(id: number) {
       if (error) throw error;
       return data as Article & { content: string | null };
     },
-    enabled: id > 0,
+    enabled: !!session && id > 0,
   });
 }
 
@@ -123,6 +129,7 @@ export interface Source {
 }
 
 export function useSources() {
+  const { session } = useAuth();
   return useQuery({
     queryKey: ["sources"],
     queryFn: async () => {
@@ -133,6 +140,7 @@ export function useSources() {
       if (error) throw error;
       return (data ?? []) as Source[];
     },
+    enabled: !!session,
   });
 }
 
@@ -149,6 +157,7 @@ export interface Topic {
 }
 
 export function useTopics() {
+  const { session } = useAuth();
   return useQuery({
     queryKey: ["topics"],
     queryFn: async () => {
@@ -159,6 +168,7 @@ export function useTopics() {
       if (error) throw error;
       return (data ?? []) as Topic[];
     },
+    enabled: !!session,
   });
 }
 
@@ -171,10 +181,12 @@ export interface User {
   active: boolean;
   timezone: string;
   delivery_hour: number;
+  role: string;
   created_at: string;
 }
 
 export function useUsers() {
+  const { session } = useAuth();
   return useQuery({
     queryKey: ["users"],
     queryFn: async () => {
@@ -185,6 +197,7 @@ export function useUsers() {
       if (error) throw error;
       return (data ?? []) as User[];
     },
+    enabled: !!session,
   });
 }
 
@@ -203,6 +216,7 @@ export interface Briefing {
 }
 
 export function useBriefings(limit = 50) {
+  const { session } = useAuth();
   return useQuery({
     queryKey: ["briefings", limit],
     queryFn: async () => {
@@ -214,6 +228,7 @@ export function useBriefings(limit = 50) {
       if (error) throw error;
       return (data ?? []) as Briefing[];
     },
+    enabled: !!session,
   });
 }
 
@@ -238,6 +253,7 @@ export interface BriefingDetail {
 }
 
 export function useBriefingDetail(id: number) {
+  const { session } = useAuth();
   return useQuery({
     queryKey: ["briefing", id],
     queryFn: async () => {
@@ -251,13 +267,14 @@ export function useBriefingDetail(id: number) {
       if (error) throw error;
       return data as unknown as BriefingDetail;
     },
-    enabled: id > 0,
+    enabled: !!session && id > 0,
   });
 }
 
 // ── Article stats over time (for chart) ────────────────
 
 export function useArticleTimeline() {
+  const { session } = useAuth();
   return useQuery({
     queryKey: ["article-timeline"],
     queryFn: async () => {
@@ -285,5 +302,6 @@ export function useArticleTimeline() {
 
       return Array.from(days.values()).sort((a, b) => a.date.localeCompare(b.date));
     },
+    enabled: !!session,
   });
 }

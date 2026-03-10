@@ -4,22 +4,95 @@ import { supabase } from "../config/database.js";
 export function registerUserCommands(program: Command): void {
   program
     .command("users:create")
-    .description("Create a new user")
+    .description("Create a new user via Supabase Auth")
     .argument("<email>", "User email address")
     .argument("[name]", "User name")
-    .action(async (email: string, name?: string) => {
-      const { data: user, error } = await supabase
-        .from("users")
-        .insert({ email, name: name || null })
-        .select("id, email")
-        .single();
-
-      if (error) {
-        console.error(`Failed to create user: ${error.message}`);
+    .option("--password <password>", "User password (min 6 characters)")
+    .option("--role <role>", "User role (admin or user)", "user")
+    .action(async (email: string, name: string | undefined, opts: { password?: string; role?: string }) => {
+      if (!opts.password) {
+        console.error("--password is required for creating auth users");
         process.exit(1);
       }
 
-      console.log(`Created user: ${user.email} (id: ${user.id})`);
+      if (opts.role && !["admin", "user"].includes(opts.role)) {
+        console.error("Role must be 'admin' or 'user'");
+        process.exit(1);
+      }
+
+      // Create the auth user (trigger will auto-create public.users row)
+      const { data: authData, error: authError } =
+        await supabase.auth.admin.createUser({
+          email,
+          password: opts.password,
+          email_confirm: true,
+          user_metadata: { name: name || null },
+        });
+
+      if (authError) {
+        console.error(`Failed to create auth user: ${authError.message}`);
+        process.exit(1);
+      }
+
+      // Set role if admin
+      if (opts.role === "admin") {
+        const { error: roleError } = await supabase
+          .from("users")
+          .update({ role: "admin" })
+          .eq("auth_id", authData.user.id);
+
+        if (roleError) {
+          console.error(`User created but failed to set role: ${roleError.message}`);
+          process.exit(1);
+        }
+      }
+
+      // Update name if provided (trigger may have already set it)
+      if (name) {
+        await supabase
+          .from("users")
+          .update({ name })
+          .eq("auth_id", authData.user.id);
+      }
+
+      console.log(
+        `Created user: ${email} (auth_id: ${authData.user.id}, role: ${opts.role ?? "user"})`
+      );
+    });
+
+  program
+    .command("users:set-role")
+    .description("Set user role (admin or user)")
+    .argument("<email>", "User email")
+    .argument("<role>", "Role: admin or user")
+    .action(async (email: string, role: string) => {
+      if (!["admin", "user"].includes(role)) {
+        console.error("Role must be 'admin' or 'user'");
+        process.exit(1);
+      }
+
+      const { data: user, error: findError } = await supabase
+        .from("users")
+        .select("id, email, role")
+        .eq("email", email)
+        .single();
+
+      if (findError || !user) {
+        console.error(`User not found: ${email}`);
+        process.exit(1);
+      }
+
+      const { error } = await supabase
+        .from("users")
+        .update({ role })
+        .eq("id", user.id);
+
+      if (error) {
+        console.error(`Failed to update role: ${error.message}`);
+        process.exit(1);
+      }
+
+      console.log(`Updated ${email}: role ${user.role} → ${role}`);
     });
 
   program
@@ -28,7 +101,7 @@ export function registerUserCommands(program: Command): void {
     .action(async () => {
       const { data: users, error } = await supabase
         .from("users")
-        .select("id, email, active, user_topics(topic_id, topics(slug))")
+        .select("id, email, active, role, user_topics(topic_id, topics(slug))")
         .order("id");
 
       if (error) {
@@ -47,7 +120,7 @@ export function registerUserCommands(program: Command): void {
             .join(", ") || "none";
           const status = user.active ? "active" : "inactive";
           console.log(
-            `  [${user.id}] ${user.email} (${status}) — topics: ${topics}`
+            `  [${user.id}] ${user.email} (${status}, ${user.role ?? "user"}) — topics: ${topics}`
           );
         }
       }

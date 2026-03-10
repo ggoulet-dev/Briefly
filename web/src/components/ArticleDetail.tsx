@@ -1,6 +1,9 @@
 import { useArticle } from "../lib/hooks";
+import { useSummarizeArticle, useFetchArticleContent } from "../lib/api";
 import { StatusBadge } from "./StatusBadge";
+import { ActionButton } from "./ActionButton";
 import { Spinner } from "./Spinner";
+import { useToast } from "./Toast";
 import { formatDistanceToNow } from "date-fns";
 
 export function ArticleDetail({
@@ -11,9 +14,15 @@ export function ArticleDetail({
   onBack: () => void;
 }) {
   const { data: article, isLoading } = useArticle(id);
+  const summarize = useSummarizeArticle();
+  const fetchContent = useFetchArticleContent();
+  const { toast } = useToast();
 
   if (isLoading) return <Spinner />;
   if (!article) return null;
+
+  const canSummarize =
+    article.summary_status === "pending" || article.summary_status === "failed";
 
   return (
     <div>
@@ -56,6 +65,43 @@ export function ArticleDetail({
           >
             Open original →
           </a>
+        </div>
+
+        {/* Admin actions */}
+        <div className="mt-4 flex items-center gap-2">
+          {canSummarize && (
+            <ActionButton
+              size="sm"
+              onClick={() =>
+                summarize.mutate(id, {
+                  onSuccess: () => toast("Article summarized", "success"),
+                  onError: (e) => toast(e.message, "error"),
+                })
+              }
+              loading={summarize.isPending}
+            >
+              Summarize
+            </ActionButton>
+          )}
+          {!article.content && (
+            <ActionButton
+              size="sm"
+              variant="secondary"
+              onClick={() =>
+                fetchContent.mutate(id, {
+                  onSuccess: (d) =>
+                    toast(
+                      d.hasContent ? "Content fetched" : "No content extracted",
+                      d.hasContent ? "success" : "error"
+                    ),
+                  onError: (e) => toast(e.message, "error"),
+                })
+              }
+              loading={fetchContent.isPending}
+            >
+              Fetch Content
+            </ActionButton>
+          )}
         </div>
 
         {article.summary && (

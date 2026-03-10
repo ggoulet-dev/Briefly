@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { useArticles } from "../lib/hooks";
+import { useSummarizeAll } from "../lib/api";
 import { PageHeader } from "../components/PageHeader";
 import { StatusBadge } from "../components/StatusBadge";
+import { ActionButton } from "../components/ActionButton";
 import { Spinner } from "../components/Spinner";
 import { EmptyState } from "../components/EmptyState";
+import { useToast } from "../components/Toast";
 import { formatDistanceToNow } from "date-fns";
 import { ArticleDetail } from "../components/ArticleDetail";
 
@@ -14,6 +17,8 @@ export function Articles() {
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const { data: articles, isLoading } = useArticles(status, 100, 0, search || undefined);
+  const summarizeAll = useSummarizeAll();
+  const { toast } = useToast();
 
   if (selectedId) {
     return <ArticleDetail id={selectedId} onBack={() => setSelectedId(null)} />;
@@ -21,7 +26,23 @@ export function Articles() {
 
   return (
     <div>
-      <PageHeader title="Articles" description="All fetched articles and their summaries" />
+      <PageHeader title="Articles" description="All fetched articles and their summaries">
+        <ActionButton
+          onClick={() =>
+            summarizeAll.mutate(undefined, {
+              onSuccess: (d) =>
+                toast(
+                  `Summarized ${d.processed} articles${d.failed ? `, ${d.failed} failed` : ""}`,
+                  d.failed ? "error" : "success"
+                ),
+              onError: (e) => toast(e.message, "error"),
+            })
+          }
+          loading={summarizeAll.isPending}
+        >
+          Summarize Pending
+        </ActionButton>
+      </PageHeader>
 
       {/* Filters */}
       <div className="mb-4 flex flex-wrap items-center gap-3">

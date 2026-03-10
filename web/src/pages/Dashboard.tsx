@@ -8,16 +8,22 @@ import {
   CartesianGrid,
 } from "recharts";
 import { useStats, useArticleTimeline, useArticles } from "../lib/hooks";
+import { useFetchAndSummarize, usePostToDiscord } from "../lib/api";
 import { StatCard } from "../components/StatCard";
 import { StatusBadge } from "../components/StatusBadge";
+import { ActionButton } from "../components/ActionButton";
 import { PageHeader } from "../components/PageHeader";
 import { Spinner } from "../components/Spinner";
+import { useToast } from "../components/Toast";
 import { formatDistanceToNow } from "date-fns";
 
 export function Dashboard() {
   const stats = useStats();
   const timeline = useArticleTimeline();
   const recentArticles = useArticles("completed", 8);
+  const fetchAndSummarize = useFetchAndSummarize();
+  const postDiscord = usePostToDiscord();
+  const { toast } = useToast();
 
   if (stats.isLoading) return <Spinner />;
 
@@ -25,10 +31,36 @@ export function Dashboard() {
 
   return (
     <div>
-      <PageHeader
-        title="Dashboard"
-        description="Overview of your news pipeline"
-      />
+      <PageHeader title="Dashboard" description="Admin overview of your news pipeline">
+        <ActionButton
+          onClick={() =>
+            fetchAndSummarize.mutate(undefined, {
+              onSuccess: (d) =>
+                toast(
+                  `Fetched ${d.fetched} articles, summarized ${d.summarized}`,
+                  "success"
+                ),
+              onError: (e) => toast(e.message, "error"),
+            })
+          }
+          loading={fetchAndSummarize.isPending}
+        >
+          Fetch & Summarize
+        </ActionButton>
+        <ActionButton
+          variant="secondary"
+          onClick={() =>
+            postDiscord.mutate(undefined, {
+              onSuccess: (d) =>
+                toast(`Posted ${d.posted} articles to Discord`, "success"),
+              onError: (e) => toast(e.message, "error"),
+            })
+          }
+          loading={postDiscord.isPending}
+        >
+          Post to Discord
+        </ActionButton>
+      </PageHeader>
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -65,6 +97,10 @@ export function Dashboard() {
         </h2>
         {timeline.isLoading ? (
           <Spinner />
+        ) : !timeline.data?.length ? (
+          <p className="py-8 text-center text-sm text-zinc-600">
+            No articles in the last 7 days
+          </p>
         ) : (
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={timeline.data}>
@@ -137,7 +173,9 @@ export function Dashboard() {
                     </p>
                   )}
                   <div className="mt-1.5 flex items-center gap-2 text-[11px] text-zinc-600">
-                    <span>{(a.sources as unknown as { name: string })?.name}</span>
+                    <span>
+                      {(a.sources as unknown as { name: string })?.name}
+                    </span>
                     <span>·</span>
                     <span>
                       {a.published_at

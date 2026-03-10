@@ -6,8 +6,10 @@
     "worker": "tsx src/worker.ts",
     "cli": "tsx src/cli/index.ts",
     "build": "tsc",
+    "api": "tsx src/api/server.ts",
     "web": "pnpm --filter briefly-web dev",
-    "web:build": "pnpm --filter briefly-web build"
+    "web:build": "pnpm --filter briefly-web build",
+    "dev": "pnpm api & pnpm web"
   },
   "type": "module",
   "license": "ISC",
@@ -19,11 +21,13 @@
     ]
   },
   "dependencies": {
+    "@hono/node-server": "^1.19.11",
     "@mozilla/readability": "^0.6.0",
     "@supabase/supabase-js": "^2.49.4",
     "bullmq": "^5.67.3",
     "commander": "^14.0.3",
     "dotenv": "^17.2.4",
+    "hono": "^4.12.7",
     "ioredis": "^5.9.2",
     "linkedom": "^0.18.12",
     "openai": "^6.20.0",

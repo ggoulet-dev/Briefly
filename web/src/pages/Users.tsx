@@ -21,6 +21,7 @@ export function Users() {
             <thead>
               <tr className="border-b border-zinc-800 bg-zinc-900/80 text-xs uppercase tracking-wider text-zinc-500">
                 <th className="px-4 py-3 text-left font-medium">User</th>
+                <th className="px-4 py-3 text-left font-medium">Role</th>
                 <th className="px-4 py-3 text-left font-medium">Status</th>
                 <th className="px-4 py-3 text-left font-medium">Timezone</th>
                 <th className="px-4 py-3 text-left font-medium">Delivery</th>
@@ -38,6 +39,17 @@ export function Users() {
                       {u.name ?? "Unnamed"}
                     </p>
                     <p className="text-xs text-zinc-500">{u.email}</p>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`inline-flex rounded-md px-2 py-0.5 text-[11px] font-medium ${
+                        u.role === "admin"
+                          ? "bg-blue-500/10 text-blue-400"
+                          : "bg-zinc-800 text-zinc-400"
+                      }`}
+                    >
+                      {u.role ?? "user"}
+                    </span>
                   </td>
                   <td className="px-4 py-3">
                     <span

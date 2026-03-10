@@ -1,67 +1,37 @@
 import { useState } from "react";
 import { useBriefings, useBriefingDetail } from "../lib/hooks";
-import { useCompileBriefings, usePostToDiscord } from "../lib/api";
 import { PageHeader } from "../components/PageHeader";
 import { StatusBadge } from "../components/StatusBadge";
-import { ActionButton } from "../components/ActionButton";
 import { Spinner } from "../components/Spinner";
 import { EmptyState } from "../components/EmptyState";
-import { useToast } from "../components/Toast";
 
-export function Briefings() {
+export function MyBriefings() {
   const { data: briefings, isLoading } = useBriefings();
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const compile = useCompileBriefings();
-  const postDiscord = usePostToDiscord();
-  const { toast } = useToast();
 
   if (selectedId) {
     return (
-      <BriefingReader id={selectedId} onBack={() => setSelectedId(null)} />
+      <MyBriefingReader id={selectedId} onBack={() => setSelectedId(null)} />
     );
   }
 
   return (
     <div>
-      <PageHeader title="Briefings" description="Compiled daily briefings for users">
-        <ActionButton
-          onClick={() =>
-            compile.mutate(undefined, {
-              onSuccess: (d) =>
-                toast(`Compiled ${d.compiled} briefings`, "success"),
-              onError: (e) => toast(e.message, "error"),
-            })
-          }
-          loading={compile.isPending}
-        >
-          Compile Briefings
-        </ActionButton>
-        <ActionButton
-          variant="secondary"
-          onClick={() =>
-            postDiscord.mutate(undefined, {
-              onSuccess: (d) =>
-                toast(`Posted ${d.posted} articles to Discord`, "success"),
-              onError: (e) => toast(e.message, "error"),
-            })
-          }
-          loading={postDiscord.isPending}
-        >
-          Post to Discord
-        </ActionButton>
-      </PageHeader>
+      <PageHeader
+        title="My Briefings"
+        description="Your compiled daily briefings"
+      />
 
       {isLoading ? (
         <Spinner />
       ) : !briefings?.length ? (
-        <EmptyState message="No briefings yet" />
+        <EmptyState message="No briefings yet. Subscribe to topics to start receiving briefings." />
       ) : (
         <div className="overflow-hidden rounded-xl border border-zinc-800">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-zinc-800 bg-zinc-900/80 text-xs uppercase tracking-wider text-zinc-500">
                 <th className="px-4 py-3 text-left font-medium">Date</th>
-                <th className="px-4 py-3 text-left font-medium">User</th>
                 <th className="px-4 py-3 text-left font-medium">Status</th>
                 <th className="px-4 py-3 text-left font-medium">Articles</th>
               </tr>
@@ -75,9 +45,6 @@ export function Briefings() {
                 >
                   <td className="whitespace-nowrap px-4 py-3 font-medium text-zinc-200">
                     {b.briefing_date}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-400">
-                    {(b.users as unknown as { email: string })?.email ?? "—"}
                   </td>
                   <td className="px-4 py-3">
                     <StatusBadge status={b.status} />
@@ -95,13 +62,18 @@ export function Briefings() {
   );
 }
 
-function BriefingReader({ id, onBack }: { id: number; onBack: () => void }) {
+function MyBriefingReader({
+  id,
+  onBack,
+}: {
+  id: number;
+  onBack: () => void;
+}) {
   const { data: briefing, isLoading } = useBriefingDetail(id);
 
   if (isLoading) return <Spinner />;
   if (!briefing) return null;
 
-  // Group articles by topic_slug
   const sections = new Map<
     string,
     { slug: string; articles: typeof briefing.briefing_articles }
@@ -121,7 +93,7 @@ function BriefingReader({ id, onBack }: { id: number; onBack: () => void }) {
         onClick={onBack}
         className="mb-4 text-sm text-zinc-400 hover:text-zinc-200 transition-colors"
       >
-        ← Back to briefings
+        &larr; Back to briefings
       </button>
 
       <div className="max-w-3xl">
@@ -130,9 +102,6 @@ function BriefingReader({ id, onBack }: { id: number; onBack: () => void }) {
             {briefing.briefing_date}
           </h1>
           <StatusBadge status={briefing.status} />
-          <span className="text-sm text-zinc-500">
-            {(briefing.users as unknown as { email: string })?.email}
-          </span>
         </div>
 
         {Array.from(sections.values()).map(({ slug, articles }) => (
@@ -171,12 +140,10 @@ function BriefingReader({ id, onBack }: { id: number; onBack: () => void }) {
                         </p>
                       )}
                       <div className="mt-2 flex items-center gap-2 text-[11px] text-zinc-600">
-                        {art.sources && (
-                          <span>{(art.sources as { name: string }).name}</span>
-                        )}
+                        {art.sources && <span>{art.sources.name}</span>}
                         {art.author && (
                           <>
-                            <span>·</span>
+                            <span>&middot;</span>
                             <span>{art.author}</span>
                           </>
                         )}
