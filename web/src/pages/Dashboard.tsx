@@ -8,10 +8,11 @@ import {
   CartesianGrid,
 } from "recharts";
 import { useStats, useArticleTimeline, useArticles } from "../lib/hooks";
-import { useFetchAndSummarize, usePostToDiscord } from "../lib/api";
+import { usePostToDiscord } from "../lib/api";
 import { StatCard } from "../components/StatCard";
 import { StatusBadge } from "../components/StatusBadge";
 import { ActionButton } from "../components/ActionButton";
+import { PipelineButton } from "../components/PipelineButton";
 import { PageHeader } from "../components/PageHeader";
 import { Spinner } from "../components/Spinner";
 import { useToast } from "../components/Toast";
@@ -21,7 +22,6 @@ export function Dashboard() {
   const stats = useStats();
   const timeline = useArticleTimeline();
   const recentArticles = useArticles("completed", 8);
-  const fetchAndSummarize = useFetchAndSummarize();
   const postDiscord = usePostToDiscord();
   const { toast } = useToast();
 
@@ -32,21 +32,7 @@ export function Dashboard() {
   return (
     <div>
       <PageHeader title="Dashboard" description="Admin overview of your news pipeline">
-        <ActionButton
-          onClick={() =>
-            fetchAndSummarize.mutate(undefined, {
-              onSuccess: (d) =>
-                toast(
-                  `Fetched ${d.fetched} articles, summarized ${d.summarized}`,
-                  "success"
-                ),
-              onError: (e) => toast(e.message, "error"),
-            })
-          }
-          loading={fetchAndSummarize.isPending}
-        >
-          Fetch & Summarize
-        </ActionButton>
+        <PipelineButton />
         <ActionButton
           variant="secondary"
           onClick={() =>
