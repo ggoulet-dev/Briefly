@@ -5,7 +5,11 @@ import { StatusBadge } from "../components/StatusBadge";
 import { Spinner } from "../components/Spinner";
 import { EmptyState } from "../components/EmptyState";
 
-export function MyBriefings() {
+export function MyBriefings({
+  onNavigate,
+}: {
+  onNavigate?: (page: string) => void;
+}) {
   const { data: briefings, isLoading } = useBriefings();
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
@@ -25,7 +29,19 @@ export function MyBriefings() {
       {isLoading ? (
         <Spinner />
       ) : !briefings?.length ? (
-        <EmptyState message="No briefings yet. Subscribe to topics to start receiving briefings." />
+        <EmptyState
+          message="No briefings yet. Subscribe to topics to start receiving briefings."
+          action={
+            onNavigate ? (
+              <button
+                onClick={() => onNavigate("my-topics")}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500"
+              >
+                Browse Topics
+              </button>
+            ) : undefined
+          }
+        />
       ) : (
         <div className="overflow-hidden rounded-xl border border-zinc-800">
           <table className="w-full text-sm">

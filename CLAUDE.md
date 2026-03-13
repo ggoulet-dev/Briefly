@@ -51,6 +51,10 @@ RSS feeds → `bulkFetcher` (dedupe + store) → `summarizer` (OpenAI) → `comp
 
 Supabase (PostgreSQL) via `@supabase/supabase-js` with service role key (bypasses RLS). Schema lives in `supabase/migration.sql`. Key tables: `users`, `topics`, `sources`, `articles` (with `summary_status` enum: pending/processing/completed/failed), `briefings`, `briefing_articles`. All queries use the Supabase JS client `.from().select().eq()` pattern.
 
+### Git Rules
+
+Never stage or commit image files (`.png`, `.jpg`, `.jpeg`, `.gif`, `.svg`, `.webp`, `.ico`). If any are found staged, unstage them before committing.
+
 ### CLI Commands
 
 Commands follow the pattern `<resource>:<action>`: `users:create`, `users:list`, `users:subscribe`, `sources:add`, `sources:list`, `sources:link`, `sources:test-fetch`, `topics:create`, `topics:list`, `articles:fetch` (supports `-s <id>` for single source), `articles:summarize`, `articles:stats`, `briefings:stats`, `discord:post`.

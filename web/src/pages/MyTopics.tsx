@@ -55,6 +55,7 @@ export function MyTopics() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["my-subscriptions"] });
+      qc.invalidateQueries({ queryKey: ["home-feed"] });
       toast("Subscribed!", "success");
     },
     onError: (e) => toast(e.message, "error"),
@@ -71,6 +72,7 @@ export function MyTopics() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["my-subscriptions"] });
+      qc.invalidateQueries({ queryKey: ["home-feed"] });
       toast("Unsubscribed", "info");
     },
     onError: (e) => toast(e.message, "error"),
@@ -94,17 +96,29 @@ export function MyTopics() {
           {topics.map((t) => {
             const isSub = subscribed?.has(t.id) ?? false;
             return (
-              <div key={t.id} className="card">
+              <div
+                key={t.id}
+                className={`card transition-colors ${
+                  isSub
+                    ? "border-l-2 border-l-blue-500"
+                    : ""
+                }`}
+              >
                 <div className="mb-1 flex items-center gap-2">
                   {t.emoji && <span className="text-lg">{t.emoji}</span>}
                   <h3 className="text-sm font-medium text-zinc-200">
                     {t.name}
                   </h3>
+                  {isSub && (
+                    <span className="ml-auto text-xs text-blue-400">Subscribed</span>
+                  )}
                 </div>
 
-                <p className="mb-3 text-xs text-zinc-500">
-                  {t.description ?? "No description"}
-                </p>
+                {t.description && (
+                  <p className="mb-3 text-xs text-zinc-500">
+                    {t.description}
+                  </p>
+                )}
 
                 {t.keywords.length > 0 && (
                   <div className="mb-3 flex flex-wrap gap-1.5">

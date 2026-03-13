@@ -79,15 +79,29 @@ export async function summarizeArticle(article: Article): Promise<void> {
   }
 }
 
-export async function summarizePendingArticles(): Promise<{
+export async function summarizePendingArticles(options?: {
+  includeFailed?: boolean;
+  limit?: number;
+}): Promise<{
   processed: number;
   failed: number;
 }> {
-  const { data: articles, error } = await supabase
+  let query = supabase
     .from("articles")
     .select("id, title, url, author, content, summary_status")
-    .eq("summary_status", "pending")
     .order("created_at", { ascending: true });
+
+  if (options?.includeFailed) {
+    query = query.in("summary_status", ["pending", "failed"]);
+  } else {
+    query = query.eq("summary_status", "pending");
+  }
+
+  if (options?.limit) {
+    query = query.limit(options.limit);
+  }
+
+  const { data: articles, error } = await query;
 
   if (error) throw new Error(`Failed to fetch pending articles: ${error.message}`);
 

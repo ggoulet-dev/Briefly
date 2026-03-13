@@ -14,6 +14,8 @@ interface UserProfile {
   email: string;
   name: string | null;
   role: string;
+  timezone: string;
+  delivery_hour: number;
 }
 
 interface AuthContextValue {
@@ -24,6 +26,7 @@ interface AuthContextValue {
   signIn: (email: string, password: string) => Promise<{ error?: string }>;
   signUp: (email: string, password: string, name: string) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
+  refreshProfile: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -36,7 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchProfile = useCallback(async (sess: Session) => {
     const { data } = await supabase
       .from("users")
-      .select("id, email, name, role")
+      .select("id, email, name, role, timezone, delivery_hour")
       .eq("auth_id", sess.user.id)
       .single();
 
@@ -91,6 +94,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
   }, []);
 
+  const refreshProfile = useCallback(() => {
+    if (session) {
+      fetchProfile(session);
+    }
+  }, [session, fetchProfile]);
+
   return (
     <AuthContext.Provider
       value={{
@@ -101,6 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signIn,
         signUp,
         signOut,
+        refreshProfile,
       }}
     >
       {children}

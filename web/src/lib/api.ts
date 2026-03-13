@@ -1,16 +1,28 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "./supabase";
 
-async function post<T = unknown>(url: string): Promise<T> {
+async function post<T = unknown>(url: string, body?: unknown): Promise<T> {
   const { data: { session } } = await supabase.auth.getSession();
   const headers: Record<string, string> = {};
   if (session?.access_token) {
     headers["Authorization"] = `Bearer ${session.access_token}`;
   }
 
-  const res = await fetch(url, { method: "POST", headers });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? `Request failed (${res.status})`);
+  const init: RequestInit = { method: "POST", headers };
+  if (body !== undefined) {
+    headers["Content-Type"] = "application/json";
+    init.body = JSON.stringify(body);
+  }
+
+  const res = await fetch(url, init);
+  const text = await res.text();
+  let data: Record<string, unknown>;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error(`Invalid response: ${text.slice(0, 200)}`);
+  }
+  if (!res.ok) throw new Error((data.error as string) ?? `Request failed (${res.status})`);
   return data as T;
 }
 
@@ -86,6 +98,34 @@ export function useFetchArticleContent() {
 }
 
 // ── Pipeline actions ───────────────────────────────────
+
+export interface PipelineOptions {
+  sourceIds?: number[];
+  summarize?: boolean;
+  includeFailed?: boolean;
+  summarizeLimit?: number;
+}
+
+export interface PipelineResult {
+  fetch: {
+    sources: { sourceId: number; sourceName: string; newArticles: number; skipped: number; error?: string }[];
+    totalNew: number;
+    totalSkipped: number;
+    totalErrors: number;
+  };
+  summarize: { processed: number; failed: number } | null;
+}
+
+export function useRunPipeline() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (options: PipelineOptions) =>
+      post<PipelineResult>("/api/pipeline/run", options),
+    onSuccess: () => {
+      qc.invalidateQueries();
+    },
+  });
+}
 
 export function useFetchAndSummarize() {
   const qc = useQueryClient();

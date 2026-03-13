@@ -164,6 +164,89 @@ app.post("/api/pipeline/fetch-and-summarize", async (c) => {
   }
 });
 
+app.post("/api/pipeline/run", async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const {
+      sourceIds,
+      summarize = true,
+      includeFailed = false,
+      summarizeLimit,
+    } = body as {
+      sourceIds?: number[];
+      summarize?: boolean;
+      includeFailed?: boolean;
+      summarizeLimit?: number;
+    };
+
+    // ── Fetch phase ──
+    const fetchResults: { sourceId: number; sourceName: string; newArticles: number; skipped: number; error?: string }[] = [];
+
+    if (sourceIds && sourceIds.length > 0) {
+      // Fetch specific sources
+      const { data: sources, error } = await supabase
+        .from("sources")
+        .select("*")
+        .in("id", sourceIds);
+
+      if (error) throw new Error(`Failed to load sources: ${error.message}`);
+
+      for (const source of sources || []) {
+        const result = await fetchFeed(source);
+        fetchResults.push({
+          sourceId: source.id,
+          sourceName: source.name,
+          newArticles: result.newArticles,
+          skipped: result.skipped,
+          error: result.error,
+        });
+      }
+    } else {
+      // Fetch all active sources
+      const results = await fetchAllFeeds();
+      for (const r of results) {
+        fetchResults.push({
+          sourceId: r.source.id,
+          sourceName: r.source.name,
+          newArticles: r.newArticles,
+          skipped: r.skipped,
+          error: r.error,
+        });
+      }
+    }
+
+    const totalNew = fetchResults.reduce((s, r) => s + r.newArticles, 0);
+
+    // ── Summarize phase ──
+    let summarizeResult = { processed: 0, failed: 0 };
+    if (summarize) {
+      const hasPending = totalNew > 0 || includeFailed;
+      if (hasPending) {
+        summarizeResult = await summarizePendingArticles({
+          includeFailed,
+          limit: summarizeLimit,
+        });
+      }
+    }
+
+    return c.json({
+      success: true,
+      fetch: {
+        sources: fetchResults,
+        totalNew,
+        totalSkipped: fetchResults.reduce((s, r) => s + r.skipped, 0),
+        totalErrors: fetchResults.filter((r) => r.error).length,
+      },
+      summarize: summarize
+        ? { processed: summarizeResult.processed, failed: summarizeResult.failed }
+        : null,
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return c.json({ error: msg }, 500);
+  }
+});
+
 // ── Briefings ──────────────────────────────────────────
 
 app.post("/api/briefings/compile", async (c) => {
@@ -190,7 +273,7 @@ app.post("/api/discord/post", async (c) => {
 
 // ── Start ──────────────────────────────────────────────
 
-const port = Number(process.env.API_PORT ?? 3100);
+const port = Number(process.env.API_PORT ?? 5174);
 
 serve({ fetch: app.fetch, port }, () => {
   logger.info(`Briefly API server running on http://localhost:${port}`);
